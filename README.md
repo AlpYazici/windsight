@@ -91,7 +91,7 @@ curl -X POST http://localhost:8000/forecast \
 ```
 
 The forecast response includes:
-- 168 hourly timesteps with P5/P25/P50/P75/P95 percentiles (kW)
+- 168 hourly timesteps with P5/P25/P50/P75/P95 percentiles (kW) — confidence bands are estimated from wind speed uncertainty, not from multiple model samples. Set `SAMPLE_COUNT >= 20` in `src/pipeline/predictor.py` for true probabilistic bands.
 - Daily energy production (MWh)
 - Capacity factor
 - Location metadata (elevation)
