@@ -1,0 +1,31 @@
+{
+  "model_path": "/Users/alpyazici/ARCH/Projects/windsight/outputs/stage1/best_model.pt",
+  "tokenizer_path": "/Users/alpyazici/ARCH/Projects/windsight/models/windfm-tokenizer",
+  "pred_horizons": [
+    24
+  ],
+  "n_samples": 50,
+  "lookback": 240,
+  "temperature": 1.0,
+  "top_p": 1.0,
+  "device": "mps",
+  "wall_time_seconds": 44.74,
+  "results": {
+    "hill_of_towie": {
+      "24": {
+        "mae": 0.42249218291327767,
+        "rmse": 0.6377439723305577,
+        "r_squared": 0.3041656584526732,
+        "mape": 342.646339563872,
+        "crps": 0.3015022508816453,
+        "aql": 0.3119679551618546,
+        "coverage_90": 0.6638888888888889,
+        "coverage_50": 0.275,
+        "pi_width_90": 0.8669848711276422,
+        "pi_width_50": 0.34431901902943435,
+        "n_windows": 30,
+        "n_timesteps": 720
+      }
+    }
+  }
+}

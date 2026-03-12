@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# pytest
+.pytest_cache/
+
+# Raw data (too large for git)
+data/*/raw/
+
+# Processed data (reproducible from raw)
+data/*/processed/
+
+# Model weights (download separately)
+models/
+
+# Training outputs (checkpoints, merged models)
+outputs/*/best_model.pt
+outputs/*/best_model_merged.pt
+outputs/*/best_lora.pt
+outputs/windfm-finetuned/
+
+# Keep training logs and evaluation results
+!outputs/*/training_log.json
+!outputs/evaluation/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# HuggingFace cache
+.cache/

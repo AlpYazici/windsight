@@ -1,0 +1,95 @@
+{
+  "args": {
+    "train_data": "data/sdwpf/processed/train.parquet",
+    "val_data": "data/sdwpf/processed/val.parquet",
+    "model_path": "/Users/alpyazici/ARCH/Projects/windsight/models/windfm",
+    "tokenizer_path": "/Users/alpyazici/ARCH/Projects/windsight/models/windfm-tokenizer",
+    "output_dir": "outputs/stage2",
+    "resume_from": "outputs/stage1/best_model.pt",
+    "lr": 3e-06,
+    "batch_size": 64,
+    "seq_len": 512,
+    "stride": 128,
+    "max_epochs": 30,
+    "patience": 5,
+    "warmup_ratio": 0.05,
+    "max_grad_norm": 1.0,
+    "num_turbines": 0,
+    "device": "mps",
+    "num_workers": 0
+  },
+  "train_paths": [
+    "data/sdwpf/processed/train.parquet"
+  ],
+  "val_paths": [
+    "data/sdwpf/processed/val.parquet"
+  ],
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_loss": 2.812505,
+      "val_loss": 3.097102,
+      "train_ce_s1": 3.505596,
+      "train_ce_s2": 2.119415,
+      "val_ce_s1": 3.650953,
+      "val_ce_s2": 2.543252,
+      "lr": 2e-06,
+      "time_s": 54.7
+    },
+    {
+      "epoch": 2,
+      "train_loss": 2.804374,
+      "val_loss": 3.099601,
+      "train_ce_s1": 3.498146,
+      "train_ce_s2": 2.110602,
+      "val_ce_s1": 3.655997,
+      "val_ce_s2": 2.543205,
+      "lr": 2.9977222746499744e-06,
+      "time_s": 54.3
+    },
+    {
+      "epoch": 3,
+      "train_loss": 2.792599,
+      "val_loss": 3.100696,
+      "train_ce_s1": 3.486836,
+      "train_ce_s2": 2.098362,
+      "val_ce_s1": 3.663716,
+      "val_ce_s2": 2.537676,
+      "lr": 2.9795419551040837e-06,
+      "time_s": 54.4
+    },
+    {
+      "epoch": 4,
+      "train_loss": 2.78172,
+      "val_loss": 3.101546,
+      "train_ce_s1": 3.476197,
+      "train_ce_s2": 2.087244,
+      "val_ce_s1": 3.668356,
+      "val_ce_s2": 2.534735,
+      "lr": 2.9434020004638756e-06,
+      "time_s": 54.4
+    },
+    {
+      "epoch": 5,
+      "train_loss": 2.771046,
+      "val_loss": 3.105047,
+      "train_ce_s1": 3.465508,
+      "train_ce_s2": 2.076585,
+      "val_ce_s1": 3.674195,
+      "val_ce_s2": 2.535899,
+      "lr": 2.8897411008222027e-06,
+      "time_s": 54.5
+    },
+    {
+      "epoch": 6,
+      "train_loss": 2.761346,
+      "val_loss": 3.111723,
+      "train_ce_s1": 3.455736,
+      "train_ce_s2": 2.066957,
+      "val_ce_s1": 3.682117,
+      "val_ce_s2": 2.541329,
+      "lr": 2.8192106268097337e-06,
+      "time_s": 55.1
+    }
+  ]
+}
