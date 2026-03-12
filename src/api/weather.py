@@ -194,6 +194,7 @@ def _fetch_historical_cached(
         "start_date": start_date,
         "end_date": end_date,
         "hourly": ",".join(HOURLY_VARIABLES),
+        "wind_speed_unit": "ms",
         "timezone": "UTC",
     }
     return _get_json(URL_HISTORICAL, params)
@@ -240,6 +241,8 @@ def fetch_historical(
 def _fetch_forecast_cached(
     latitude: float,
     longitude: float,
+    past_days: int,
+    forecast_days: int,
     _bucket: int,
 ) -> dict:
     """Cached wrapper around the Open-Meteo Forecast API."""
@@ -247,7 +250,9 @@ def _fetch_forecast_cached(
         "latitude": latitude,
         "longitude": longitude,
         "hourly": ",".join(HOURLY_VARIABLES),
-        "forecast_days": 7,
+        "wind_speed_unit": "ms",
+        "past_days": past_days,
+        "forecast_days": forecast_days,
         "timezone": "UTC",
     }
     return _get_json(URL_FORECAST, params)
@@ -257,8 +262,10 @@ def fetch_forecast(
     latitude: float,
     longitude: float,
     hub_height: float = 80.0,
+    past_days: int = 0,
+    forecast_days: int = 7,
 ) -> pd.DataFrame:
-    """Fetch 7-day forecast and return WindFM-formatted DataFrame.
+    """Fetch forecast (and optionally recent history) as WindFM DataFrame.
 
     Parameters
     ----------
@@ -266,19 +273,31 @@ def fetch_forecast(
         Location coordinates.
     hub_height : float
         Turbine hub height in metres (default 80 m).
+    past_days : int
+        Number of past days to include (0–92). Uses the forecast API's
+        ``past_days`` parameter which, unlike the archive API, has no
+        multi-day delay.
+    forecast_days : int
+        Number of forecast days (default 7, max 16).
 
     Returns
     -------
     pd.DataFrame
         Columns: ``time`` (UTC datetime), plus the 6 WindFM features.
     """
-    data = _fetch_forecast_cached(latitude, longitude, _cache_bucket())
+    data = _fetch_forecast_cached(
+        latitude, longitude, past_days, forecast_days, _cache_bucket(),
+    )
     return _hourly_to_windfm(data, hub_height)
 
 
 # ---------------------------------------------------------------------------
 # Combined: historical + forecast
 # ---------------------------------------------------------------------------
+# Maximum past_days supported by the Open-Meteo forecast API
+_FORECAST_API_MAX_PAST_DAYS = 92
+
+
 def fetch_weather(
     latitude: float,
     longitude: float,
@@ -289,10 +308,45 @@ def fetch_weather(
 
     The resulting DataFrame covers *history_days* in the past plus the
     7-day forecast, all in WindFM 6-feature format.
+
+    For short histories (≤ 92 days) the forecast API's ``past_days``
+    parameter is used, which avoids the multi-day data delay of the
+    archive API and returns data right up to the current hour.
+
+    For longer histories the archive API is used for the bulk of the
+    data, and the forecast API with ``past_days`` fills in the most
+    recent days that the archive hasn't indexed yet.
     """
-    hist = fetch_historical(latitude, longitude, days=history_days, hub_height=hub_height)
-    fcast = fetch_forecast(latitude, longitude, hub_height=hub_height)
-    combined = pd.concat([hist, fcast], ignore_index=True)
+    forecast_days = 7
+
+    if history_days <= _FORECAST_API_MAX_PAST_DAYS:
+        # Single call — forecast API handles both history and forecast
+        df = fetch_forecast(
+            latitude, longitude,
+            hub_height=hub_height,
+            past_days=history_days,
+            forecast_days=forecast_days,
+        )
+        return df
+
+    # Long history: archive API for the bulk + forecast API for recent days
+    # Archive API is delayed ~5 days, so stop 7 days ago and let the
+    # forecast API's past_days cover the gap.
+    archive_gap_days = 7
+    archive_days = history_days - archive_gap_days
+
+    hist = fetch_historical(
+        latitude, longitude,
+        days=archive_days,
+        hub_height=hub_height,
+    )
+    recent = fetch_forecast(
+        latitude, longitude,
+        hub_height=hub_height,
+        past_days=archive_gap_days,
+        forecast_days=forecast_days,
+    )
+    combined = pd.concat([hist, recent], ignore_index=True)
     combined = combined.drop_duplicates(subset=["time"]).sort_values("time").reset_index(drop=True)
     return combined
 

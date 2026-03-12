@@ -1,93 +1,53 @@
 # WindSight
 
-## Proje Hedefi
-WindFM foundation modeli + Open-Meteo hava durumu API'si kullanarak herhangi bir konum icin ruzgar turbini guc tahmini yapan bir SaaS urun.
+## Project Goal
+Wind power generation forecasting for any location worldwide using WindFM foundation model + Open-Meteo weather API.
 
-Kullanici haritadan konum secer, turbin modeli secer → 7 gunluk saatlik guc tahmini + guven araliklari alir.
+User selects a location on the map, picks a turbine model → gets a 7-day hourly power forecast with confidence intervals.
 
-## Mimari
+## Architecture
 ```
-Konum + Turbin secimi
-    → Open-Meteo API (hava durumu gecmisi + 7 gun tahmin)
-    → Guc egrisi ile sentetik guc gecmisi uret
-    → WindFM inference (100 ornek → olasiliksal tahmin)
-    → Son isleme (cut-in/cut-out, kapasite siniri)
-    → FastAPI + Streamlit dashboard
+Location (lat/lon) + Turbine selection
+  → Open-Meteo Forecast API (10-day history via past_days + 7-day forecast)
+  → Synthetic power history via turbine power curve
+  → WindFM inference (1 sample, autoregressive)
+  → Post-processing (cut-in/cut-out, capacity limits, synthetic confidence bands)
+  → FastAPI backend + React/Next.js frontend
 ```
 
-## Temel Kararlar
-- Cografi duzeltme katmani MVP'den cikarildi (yeterli veri yok, musteriler biriktikce v5'te eklenir)
-- WindFM zero-shot calisir ama SDWPF ile fine-tune yapilacak
-- XGBoost ensemble olarak eklenecek (SDWPF + diger verilerle egitilir)
-- Sentetik guc gecmisi: yeni konumlarda gecmis power verisi yok, turbin guc egrisinden uretilir
-- Tokenizer freeze edilir, sadece AR Transformer fine-tune edilir
+## Key Decisions
+- WindFM used **zero-shot** — no fine-tuning needed. Fine-tuning was tested (SDWPF, 28 epochs) but degraded performance due to teacher-forcing/autoregressive mismatch. LoRA showed only marginal improvement (+2% R²).
+- Single sample inference (SAMPLE_COUNT=1) to keep memory usage minimal (~2 GB). Confidence bands (P5/P25/P75/P95) are synthetically estimated from wind speed uncertainty.
+- Synthetic power history: no real power data at new locations, so it's generated from the turbine's power curve.
+- Weather data fetched via Open-Meteo's forecast API `past_days` parameter (up to 92 days) to avoid archive API's multi-day data delay that caused NaN issues.
 
-## WindFM Teknik
-- Model: `NeoQuasar/WindFM` (16 MB, 8.1M parametre)
+## WindFM Technical
+- Model: `NeoQuasar/WindFM` (16 MB, 8.1M params)
 - Tokenizer: `NeoQuasar/WindFM-Tokenizer` (15 MB)
 - Repo: https://github.com/shiyu-coder/WindFM
-- Girdi: 6 ozellik [wind_speed, wind_direction, power, density, temperature, pressure] + UTC timestamp
-- Birimler: m/s, derece, MW, kg/m3, Kelvin, Pascal
-- Normalizasyon: per-sample z-score (otomatik)
+- Input: 6 features [wind_speed, wind_direction, power, density, temperature, pressure] + UTC timestamp
+- Units: m/s, degrees, MW, kg/m³, Kelvin, Pascal
+- Normalization: per-window z-score (automatic)
 - Power = feature index 2
-- Max context: 512 adim
+- Max context: 512 timesteps
+- Device: CPU, CUDA, Apple Silicon MPS (2.6x faster than CPU)
 
-## Veri Setleri
+## Model Files
+- WindFM code: `WindFM/` (git submodule)
+- Model weights: `models/windfm/model.safetensors`
+- Tokenizer weights: `models/windfm-tokenizer/model.safetensors`
 
-### Egitim
-| Veri Seti | Turbin | Lokasyon | Durum |
+## Stack
+- **Backend**: FastAPI (`api.py`) on port 8000
+- **Frontend**: Next.js 16 + React + TypeScript + Tailwind CSS (`frontend/`) on port 3001
+- **Map**: react-leaflet with CARTO light tiles (no API key)
+- **Charts**: recharts (forecast, energy, uncertainty)
+- **Weather**: Open-Meteo (free, no API key)
+
+## Evaluation Datasets
+| Dataset | Turbines | Location | Purpose |
 |---|---|---|---|
-| SDWPF | 134 x Sinovel 1.5MW | Cin | data/sdwpf/raw/ ✅ indirildi (278 MB parquet) |
-| Kelmarsh | 6 x Senvion MM92 | Ingiltere | data/kelmarsh/raw/ ✅ indirildi (2016-2021) |
-| Penmanshiel | 14 x Senvion MM82 | Iskocya | data/penmanshiel/raw/ ✅ 2020 yili indirildi (662 MB) |
-
-### Test (held-out)
-| Veri Seti | Turbin | Lokasyon | Durum |
-|---|---|---|---|
-| Hill of Towie | 21 x Siemens SWT-2.3 | Iskocya | data/hill_of_towie/raw/ ✅ 2020 yili indirildi (1.3 GB) |
-
-### La Haute Borne (4 turbin, Fransa) — ENGIE portali kapali, erisilemiyor.
-
-## Model Dosyalari
-- WindFM repo: `WindFM/` (kod)
-- Model agirliklari: `models/windfm/model.safetensors`
-- Tokenizer agirliklari: `models/windfm-tokenizer/model.safetensors`
-
-## User Story Durumu
-| US | Aciklama | Durum |
-|---|---|---|
-| US-001 | WindFM'i MPS'te calistir | ✅ Tamamlandi (MPS 2.6x hizli, docs/mps_compatibility.md) |
-| US-002 | SDWPF'yi WindFM formatina cevir | ✅ Tamamlandi (train/val/test parquet) |
-| US-002b | Kelmarsh/Penmanshiel/HoT islemek | ✅ Tamamlandi (eval.parquet) |
-| US-003 | WindFM fine-tune (SDWPF) | ✅ 28 epoch, val_loss 4.21→3.15 (25.2% reduction) |
-| US-004 | Open-Meteo API client | ✅ src/api/weather.py (29 tests) |
-| US-005 | Turbin veritabani | ✅ data/turbine_specs.json (13 model, 22 tests) |
-| US-006 | Tahmin pipeline'i | ✅ src/pipeline/predictor.py |
-| US-007 | FastAPI + Streamlit | ✅ api.py + app.py |
-| US-008 | Cross-geography dogrulama | 🔄 Evaluation running |
-
-## Islenmis Veri Ozeti
-| Dataset | Rows | Turbines | Period |
-|---|---|---|---|
-| SDWPF train | 1,779,125 | 134 | Jan 2020 – Aug 2021 |
-| SDWPF val | 195,854 | 134 | Sep – Oct 2021 |
-| SDWPF test | 189,164 | 134 | Nov – Dec 2021 |
-| Kelmarsh eval | 265,134 | 6 | May 2016 – Jun 2021 |
-| Penmanshiel eval | 74,533 | 9 | Jan – Dec 2020 |
-| Hill of Towie eval | 183,650 | 21 | Jan 2020 – Jan 2021 |
-
-## Veri Isleme Notlari
-- SDWPF: T2m (ERA5) kullanildi, Etmp degil (Etmp=28°C ortalam guvenilmez)
-- Kelmarsh/Penmanshiel/HoT: Atmosferik basinc yok → barometrik formulle turetildi
-- Hill of Towie: Ruzgar yonu yok → nacelle yaw pozisyonu proxy olarak kullanildi
-- Tum veriler saatlik ortalamaya donusturuldu
-
-## Fine-Tuning Sonuclari
-- Epochs: 28 (early stopping, best at epoch 23)
-- Val loss: 4.2120 → 3.1506 (25.2% reduction)
-- Frozen: Tokenizer (3.96M params), Trained: AR Transformer (4.1M params)
-- Checkpoint: outputs/windfm-finetuned/best_model.pt (16 MB)
-
-## PRD
-Detayli PRD: `prd-windsight.md`
-Detayli Plan: `PLAN.md`
+| SDWPF | 134 x Sinovel 1.5MW | China | Training/validation |
+| Kelmarsh | 6 x Senvion MM92 | England | Evaluation |
+| Penmanshiel | 14 x Senvion MM82 | Scotland | Evaluation |
+| Hill of Towie | 21 x Siemens SWT-2.3 | Scotland | Held-out test |

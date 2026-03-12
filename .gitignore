@@ -28,7 +28,7 @@ data/*/raw/
 data/*/processed/
 
 # Model weights (download separately)
-models/
+/models/
 
 # Training outputs (checkpoints, merged models)
 outputs/*/best_model.pt
@@ -40,9 +40,17 @@ outputs/windfm-finetuned/
 !outputs/*/training_log.json
 !outputs/evaluation/
 
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Node / Frontend
+node_modules/
+frontend/.next/
+frontend/out/
 
 # Notebooks checkpoints
 .ipynb_checkpoints/

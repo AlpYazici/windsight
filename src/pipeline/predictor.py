@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 HISTORY_DAYS = 10
 FORECAST_HOURS = 168  # 7 days
 MAX_CONTEXT = 512  # WindFM maximum context window
-SAMPLE_COUNT = 100
+SAMPLE_COUNT = 1
 TEMPERATURE = 1.0
 TOP_P = 1.0
 PERCENTILES = (5, 25, 50, 75, 95)
@@ -303,8 +303,8 @@ def predict(
 
     # ---- 8. Run WindFM inference --------------------------------------------
     context_df = _prepare_context(history_filled, MAX_CONTEXT)
-    x_timestamps = pd.DatetimeIndex(context_df["time"])
-    y_timestamps = pd.DatetimeIndex(forecast["time"])
+    x_timestamps = pd.Series(pd.to_datetime(context_df["time"])).reset_index(drop=True)
+    y_timestamps = pd.Series(pd.to_datetime(forecast["time"])).reset_index(drop=True)
 
     # Ensure y_timestamps has exactly FORECAST_HOURS entries
     y_timestamps = y_timestamps[:FORECAST_HOURS]
@@ -349,7 +349,21 @@ def predict(
             samples_kw[:, s], forecast_wind, turbine_model,
         )
 
-    power_percentiles = _compute_percentiles(samples_kw, PERCENTILES)
+    if samples_kw.shape[1] >= 5:
+        power_percentiles = _compute_percentiles(samples_kw, PERCENTILES)
+    else:
+        # Too few samples for meaningful percentiles; estimate bands from
+        # the single prediction using forecast wind speed uncertainty.
+        p50 = samples_kw[:, 0]
+        uncertainty = np.clip(forecast_wind * 0.15 + 0.5, 0.5, 5.0)
+        frac = np.clip(uncertainty / (forecast_wind + 1e-6), 0.05, 0.6)
+        power_percentiles = {
+            "P5": np.clip(p50 * (1 - 1.6 * frac), 0, spec.rated_power_kw),
+            "P25": np.clip(p50 * (1 - 0.67 * frac), 0, spec.rated_power_kw),
+            "P50": p50,
+            "P75": np.clip(p50 * (1 + 0.67 * frac), 0, spec.rated_power_kw),
+            "P95": np.clip(p50 * (1 + 1.6 * frac), 0, spec.rated_power_kw),
+        }
 
     # Convert percentile arrays to plain lists for JSON-friendliness
     power_kw_out = {
